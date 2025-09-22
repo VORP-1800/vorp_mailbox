@@ -3,26 +3,22 @@ local mailboxOpened = false
 local messageCache = {}
 local canRefreshMessage = true
 local ready = false
+local postmen = {}
+local blips = {}
 
 AddEventHandler('onClientResourceStart', function(resourceName)
-    if (GetCurrentResourceName() ~= resourceName) then
-        return
-    end
+    if (GetCurrentResourceName() ~= resourceName) then return end
 
-    Locales[Config.locale]["TextNearMailboxLocation"] = Locales[Config.locale]["TextNearMailboxLocation"]:gsub("%$1",
-        Config.keyToOpen):gsub("%$2", Config.keyToOpenBroadcast)
-
-    for _, location in pairs(Config.locations) do
-        SetBlipAtPos(location.x, location.y, location.z)
-    end
-
+    Locales[Config.locale]["TextNearMailboxLocation"] =
+        Locales[Config.locale]["TextNearMailboxLocation"]
+        :gsub("%$1", Config.keyToOpen)
+        :gsub("%$2", Config.keyToOpenBroadcast)
 
     SendNUIMessage({ action = "set_language", language = json.encode(Locales[Config.locale]) })
-    TriggerServerEvent("mailbox:getUsers");
-    TriggerServerEvent("mailbox:getMessages");
+    TriggerServerEvent("mailbox:getUsers")
+    TriggerServerEvent("mailbox:getMessages")
 
     ready = true
-
 end)
 
 RegisterNetEvent('mailbox:receiveMessage')
@@ -59,7 +55,7 @@ end)
 
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(1)
+        Citizen.Wait(5)
 
         if not ready then
             return
@@ -81,7 +77,7 @@ end)
 
 function IsNearbyMailbox()
     for _, mailbox in pairs(Config.locations) do
-        if IsPlayerNearCoords(mailbox.x, mailbox.y, mailbox.z, 2) then
+        if IsPlayerNearCoords(mailbox.coords.x, mailbox.coords.y, mailbox.coords.z, 2.0) then
             return true
         end
     end
@@ -195,14 +191,12 @@ function DrawTexture(textureDict, textureName, x, y, width, height, rotation, r,
     DrawSprite(textureDict, textureName, x, y + 0.015, width, height, rotation, r, g, b, a, true);
 end
 
-function SetBlipAtPos(x, y, z)
-    --blip--
-    --local blipname = "" .. name
+local function CreateMailboxBlip(x, y, z)
     local bliphash = 1475382911
     local blip = Citizen.InvokeNative(0x554D9D53F696D002, 1664425300, x, y, z)
-
     Citizen.InvokeNative(0x74F74D3207ED525C, blip, bliphash, 1) -- See blips here: https://cloudy-docs.bubbleapps.io/rdr2_blips
     Citizen.InvokeNative(0x9CB1A1623062F402, blip, Config.BlipName)
+    return blip
 end
 
 function DisplayTip(message, time)
@@ -220,3 +214,58 @@ function table.find(f, l) -- find element v of l satisfying f(v)
     end
     return nil
 end
+
+CreateThread(function()
+    repeat Wait(100) until ready
+    Wait(300)
+
+    --print(("Spawning mailbox NPCs... total:\t%s"):format(#Config.locations))
+
+    local model = GetHashKey(Config.NpcModel)
+    if not IsModelValid(model) then
+        print(("[config.lua] ^1Model %s invalid, fallback to player model^7"):format(Config.NpcModel))
+        model = GetEntityModel(PlayerPedId())
+    end
+
+    RequestModel(model, false)
+    repeat Wait(50) until HasModelLoaded(model)
+
+    for _, data in ipairs(Config.locations) do
+        local ped = CreatePed(model, data.coords.x, data.coords.y, data.coords.z - 1.0, data.coords.w, false, false, false, false)
+        repeat Wait(100) until DoesEntityExist(ped)
+
+        Citizen.InvokeNative(0x283978A15512B2FE, ped, true) -- random outfit
+        PlaceEntityOnGroundProperly(ped)
+        SetEntityCanBeDamaged(ped, false)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        FreezeEntityPosition(ped, true)
+        SetPedCanRagdoll(ped, false)
+
+        table.insert(postmen, ped)
+
+        local blip = CreateMailboxBlip(data.coords.x, data.coords.y, data.coords.z)
+        table.insert(blips, blip)
+    end
+
+    SetModelAsNoLongerNeeded(model)
+end)
+
+AddEventHandler("onResourceStop", function(res)
+    if res ~= GetCurrentResourceName() then return end
+
+    for _, ped in ipairs(postmen) do
+        if ped and DoesEntityExist(ped) then
+            DeleteEntity(ped)
+        end
+    end
+    postmen = {}
+
+    for _, blip in ipairs(blips) do
+        if blip and DoesBlipExist(blip) then
+            RemoveBlip(blip)
+        end
+    end
+    blips = {}
+
+    --print("^2[Mailbox]^7 Cleaned up NPCs and blips")
+end)
