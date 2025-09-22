@@ -370,7 +370,9 @@ window.addEventListener('message', (event) => {
 	initInteractions();
 });
 
-
-
-
-
+document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape" && $("body").is(":visible")) {
+        const messages = window.localStorage.getItem('mailbox_letters') || "[]";
+        $.post('http://vorp_mailbox/close', JSON.stringify({messages}));
+    }
+});
