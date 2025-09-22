@@ -251,3 +251,17 @@ li a {
     text-decoration: none;
 }
 
+.mailbox-letter-message {
+    height: auto;
+    width: auto;
+    padding: 15px;
+    color: black;
+
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+
+    max-height: 300px;
+    overflow-y: auto;
+}
