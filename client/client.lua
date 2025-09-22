@@ -103,14 +103,15 @@ end
 -- UI Events
 
 RegisterNUICallback("close", function(payload)
-
-    -- First close UI. In case of fail, the user will not be stuck focused on the UI
     SetNuiFocus(false, false)
     SendNUIMessage({ action = "close" })
-
     mailboxOpened = false
 
-    local messages = json.decode(payload.messages)
+    local messages = nil
+    if payload and payload.messages then
+        messages = json.decode(payload.messages)
+    end
+
     local toDelete = {}
     local toMarkAsOpened = {}
 
@@ -120,7 +121,6 @@ RegisterNUICallback("close", function(payload)
 
     for _, message in pairs(messageCache) do
         local msg = nil
-
         for _, m in pairs(messages) do
             if m.id == message.id then
                 msg = m
@@ -128,19 +128,21 @@ RegisterNUICallback("close", function(payload)
             end
         end
 
-        if msg == nil then -- if message is not found, then message is deleted
+        if msg == nil then
             toDelete[#toDelete + 1] = message.id
-        elseif not message.opened and msg.opened then -- if cached message is not marked as opened but received message is, update
+        elseif not message.opened and msg.opened then
             toMarkAsOpened[#toMarkAsOpened + 1] = message.id
         end
     end
 
-    -- Send data to server
-    TriggerServerEvent("mailbox:updateMessages", { toDelete = toDelete, toMarkAsOpened = toMarkAsOpened });
+    TriggerServerEvent("mailbox:updateMessages", {
+        toDelete = toDelete,
+        toMarkAsOpened = toMarkAsOpened
+    })
 
-    -- Finally, Cache received messages from UI as most recent messages
     messageCache = messages
 end)
+
 
 RegisterNUICallback("send", function(payload)
     local receiver = payload.receiver
