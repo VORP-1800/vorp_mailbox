@@ -4,19 +4,21 @@ Config.locale = "es"
 Config.keyToOpen = "U"
 Config.keyToOpenBroadcast = "G"
 Config.locations = {
-    {x = -179.0, y = 626.0, z = 113.0},         -- Valentine
-    { x = -875.0, y = -1329.27, z = 43.96 },    -- Blackwater
-    {x = -1765.18, y = -384.21, z = 157.74},    -- Strawberry
-    {x = 1289.91, y = -1300.89, z = 77.04},     -- Rhodes
-    { x = 2747.23, y = -1394.92, z = 46.23 },   -- Saint Denis
-	{ x = 1522.05, y = 438.76, z = 90.68 },     -- Emerald
-    { x = 2985.92, y = 568.21, z = 44.63 },     -- Van Horn
-    { x = 2931.48, y = 1283.01, z = 44.65 },    -- Annesburg
-    { x = -1301.32, y = 398.5, z = 95.43 },     -- Bigvalley
-    { x = -1094.42, y = -574.89, z = 82.41 },   -- Rigs Station
-    { x = -3729.17, y = -2603.31, z = -12.94 }, -- Armadillo
-    { x = -5227.21, y = -3471.09, z = -20.55 }  -- Rio Bravo
+    { label = "Valentine",   coords = vector4(-177.9952, 628.0817, 114.0896, 145.8196) },
+    { label = "Blackwater",  coords = vector4(-875.0, -1329.27, 43.96, 90.0) },
+    { label = "Strawberry",  coords = vector4(-1765.18, -384.21, 157.74, 180.0) },
+    { label = "Rhodes",      coords = vector4(1289.91, -1300.89, 77.04, 180.0) },
+    { label = "Saint Denis", coords = vector4(2747.23, -1394.92, 46.23, 180.0) },
+    { label = "Emerald",     coords = vector4(1522.05, 438.76, 90.68, 180.0) },
+    { label = "Van Horn",    coords = vector4(2985.92, 568.21, 44.63, 180.0) },
+    { label = "Annesburg",   coords = vector4(2931.48, 1283.01, 44.65, 180.0) },
+    { label = "Big Valley",  coords = vector4(-1301.32, 398.5, 95.43, 180.0) },
+    { label = "Riggs Station", coords = vector4(-1094.42, -574.89, 82.41, 180.0) },
+    { label = "Armadillo",   coords = vector4(-3729.17, -2603.31, -12.94, 180.0) },
+    { label = "Rio Bravo",   coords = vector4(-5227.21, -3471.09, -20.55, 180.0) }
 }
+
+Config.NpcModel = "U_M_M_BIVFOREMAN_01"
 
 Config.BlipName = "Mail Box"
 

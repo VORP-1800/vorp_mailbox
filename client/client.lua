@@ -3,26 +3,22 @@ local mailboxOpened = false
 local messageCache = {}
 local canRefreshMessage = true
 local ready = false
+local postmen = {}
+local blips = {}
 
 AddEventHandler('onClientResourceStart', function(resourceName)
-    if (GetCurrentResourceName() ~= resourceName) then
-        return
-    end
+    if (GetCurrentResourceName() ~= resourceName) then return end
 
-    Locales[Config.locale]["TextNearMailboxLocation"] = Locales[Config.locale]["TextNearMailboxLocation"]:gsub("%$1",
-        Config.keyToOpen):gsub("%$2", Config.keyToOpenBroadcast)
-
-    for _, location in pairs(Config.locations) do
-        SetBlipAtPos(location.x, location.y, location.z)
-    end
-
+    Locales[Config.locale]["TextNearMailboxLocation"] =
+        Locales[Config.locale]["TextNearMailboxLocation"]
+        :gsub("%$1", Config.keyToOpen)
+        :gsub("%$2", Config.keyToOpenBroadcast)
 
     SendNUIMessage({ action = "set_language", language = json.encode(Locales[Config.locale]) })
-    TriggerServerEvent("mailbox:getUsers");
-    TriggerServerEvent("mailbox:getMessages");
+    TriggerServerEvent("mailbox:getUsers")
+    TriggerServerEvent("mailbox:getMessages")
 
     ready = true
-
 end)
 
 RegisterNetEvent('mailbox:receiveMessage')
@@ -81,7 +77,7 @@ end)
 
 function IsNearbyMailbox()
     for _, mailbox in pairs(Config.locations) do
-        if IsPlayerNearCoords(mailbox.x, mailbox.y, mailbox.z, 2) then
+        if IsPlayerNearCoords(mailbox.coords.x, mailbox.coords.y, mailbox.coords.z, 2.0) then
             return true
         end
     end
@@ -103,14 +99,15 @@ end
 -- UI Events
 
 RegisterNUICallback("close", function(payload)
-
-    -- First close UI. In case of fail, the user will not be stuck focused on the UI
     SetNuiFocus(false, false)
     SendNUIMessage({ action = "close" })
-
     mailboxOpened = false
 
-    local messages = json.decode(payload.messages)
+    local messages = nil
+    if payload and payload.messages then
+        messages = json.decode(payload.messages)
+    end
+
     local toDelete = {}
     local toMarkAsOpened = {}
 
@@ -120,7 +117,6 @@ RegisterNUICallback("close", function(payload)
 
     for _, message in pairs(messageCache) do
         local msg = nil
-
         for _, m in pairs(messages) do
             if m.id == message.id then
                 msg = m
@@ -128,19 +124,21 @@ RegisterNUICallback("close", function(payload)
             end
         end
 
-        if msg == nil then -- if message is not found, then message is deleted
+        if msg == nil then
             toDelete[#toDelete + 1] = message.id
-        elseif not message.opened and msg.opened then -- if cached message is not marked as opened but received message is, update
+        elseif not message.opened and msg.opened then
             toMarkAsOpened[#toMarkAsOpened + 1] = message.id
         end
     end
 
-    -- Send data to server
-    TriggerServerEvent("mailbox:updateMessages", { toDelete = toDelete, toMarkAsOpened = toMarkAsOpened });
+    TriggerServerEvent("mailbox:updateMessages", {
+        toDelete = toDelete,
+        toMarkAsOpened = toMarkAsOpened
+    })
 
-    -- Finally, Cache received messages from UI as most recent messages
     messageCache = messages
 end)
+
 
 RegisterNUICallback("send", function(payload)
     local receiver = payload.receiver
@@ -193,14 +191,12 @@ function DrawTexture(textureDict, textureName, x, y, width, height, rotation, r,
     DrawSprite(textureDict, textureName, x, y + 0.015, width, height, rotation, r, g, b, a, true);
 end
 
-function SetBlipAtPos(x, y, z)
-    --blip--
-    --local blipname = "" .. name
+local function CreateMailboxBlip(x, y, z)
     local bliphash = 1475382911
     local blip = Citizen.InvokeNative(0x554D9D53F696D002, 1664425300, x, y, z)
-
     Citizen.InvokeNative(0x74F74D3207ED525C, blip, bliphash, 1) -- See blips here: https://cloudy-docs.bubbleapps.io/rdr2_blips
     Citizen.InvokeNative(0x9CB1A1623062F402, blip, Config.BlipName)
+    return blip
 end
 
 function DisplayTip(message, time)
@@ -218,3 +214,59 @@ function table.find(f, l) -- find element v of l satisfying f(v)
     end
     return nil
 end
+
+CreateThread(function()
+    repeat Wait(100) until ready
+    Wait(300)
+
+    --print(("Spawning mailbox NPCs... total:\t%s"):format(#Config.locations))
+
+    local model = GetHashKey(Config.NpcModel)
+    if not IsModelValid(model) then
+        print(("[config.lua] ^1Model %s invalid, fallback to player model^7"):format(Config.NpcModel))
+        model = GetEntityModel(PlayerPedId())
+    end
+
+    RequestModel(model, false)
+    repeat Wait(50) until HasModelLoaded(model)
+
+    for _, data in ipairs(Config.locations) do
+        local ped = CreatePed(model, data.coords.x, data.coords.y, data.coords.z - 1.0, data.coords.w, false, false, false, false)
+        repeat Wait(100) until DoesEntityExist(ped)
+
+        Citizen.InvokeNative(0x283978A15512B2FE, ped, true) -- random outfit
+        PlaceEntityOnGroundProperly(ped)
+        SetEntityCanBeDamaged(ped, false)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        FreezeEntityPosition(ped, true)
+        SetPedCanRagdoll(ped, false)
+
+        table.insert(postmen, ped)
+
+        local blip = CreateMailboxBlip(data.coords.x, data.coords.y, data.coords.z)
+        table.insert(blips, blip)
+    end
+
+    SetModelAsNoLongerNeeded(model)
+end)
+
+AddEventHandler("onResourceStop", function(res)
+    if res ~= GetCurrentResourceName() then return end
+
+    for _, ped in ipairs(postmen) do
+        if ped and DoesEntityExist(ped) then
+            DeleteEntity(ped)
+        end
+    end
+    postmen = {}
+
+    for _, blip in ipairs(blips) do
+        if blip and DoesBlipExist(blip) then
+            RemoveBlip(blip)
+        end
+    end
+    blips = {}
+
+    --print("^2[Mailbox]^7 Cleaned up NPCs and blips")
+
+end)
